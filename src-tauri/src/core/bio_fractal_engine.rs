@@ -27,20 +27,34 @@ impl BioFractalEngine {
         }
     }
 
-    /// [1단계: 4-State 프랙탈 변환 (Mock)]
-    /// 실제 픽셀이나 가중치를 BPSN 4-State(+1, -1, +0, -0)로 양자화(Quantization)하여 뼈대만 남깁니다.
+    /// [1단계: 4-State 프랙탈 변환 (Rayon 멀티코어 & 4x 압축)]
+    /// 실제 바이트 데이터를 BPSN 4-State(+1, -1, +0, -0)로 양자화하여,
+    /// 4개의 상태를 1바이트(u8)에 팩킹(Packing)합니다. (메모리 1/4 압축 및 멀티코어 가속)
     fn transform_to_4state_fractal(raw_data: &[u8]) -> Vec<u8> {
-        // (개념 증명) 바이트 데이터를 2비트짜리 BPSN 상태로 압축 사상(Mapping)
-        let mut fractal_states = Vec::with_capacity(raw_data.len());
-        for &byte in raw_data {
-            let state = match byte % 4 {
-                0 => BpsnState::PlusOne,
-                1 => BpsnState::MinusOne,
-                2 => BpsnState::PlusZero,
-                _ => BpsnState::MinusZero,
-            };
-            fractal_states.push(state as u8);
-        }
+        let packed_len = (raw_data.len() + 3) / 4;
+        let mut fractal_states = vec![0u8; packed_len];
+
+        // Rayon 병렬 반복자(par_iter_mut)를 사용하여 전체 CPU 코어 풀가동
+        fractal_states.par_iter_mut().enumerate().for_each(|(i, byte_ref)| {
+            let raw_idx = i * 4;
+            let mut packed_byte = 0u8;
+            
+            for j in 0..4 {
+                if raw_idx + j < raw_data.len() {
+                    // 실제 모델 픽셀/가중치 값을 2비트 뼈대(State)로 단순화
+                    let state = match raw_data[raw_idx + j] % 4 {
+                        0 => BpsnState::PlusOne as u8,
+                        1 => BpsnState::MinusOne as u8,
+                        2 => BpsnState::PlusZero as u8,
+                        _ => BpsnState::MinusZero as u8,
+                    };
+                    // 비트 시프트를 통해 1바이트 안에 4개의 조각을 우겨넣음
+                    packed_byte |= state << (j * 2);
+                }
+            }
+            *byte_ref = packed_byte;
+        });
+
         fractal_states
     }
 
