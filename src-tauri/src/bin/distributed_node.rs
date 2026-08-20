@@ -19,7 +19,12 @@ const WORKER_PORT: u16 = 8080;
 async fn main() {
     let args: Vec<String> = env::args().collect();
     let mut mode = "--master";
-    let mut start_shard = 1; // 기본적으로 1번째 조각부터 시작
+    
+    // 환경변수에서 우선적으로 가져옵니다 (HF Space에서 세팅한 변수)
+    let mut start_shard = env::var("RESUME_SHARD")
+        .unwrap_or_else(|_| "1".to_string())
+        .parse::<usize>()
+        .unwrap_or(1);
 
     // 인자 파싱 (간단 구현)
     for (i, arg) in args.iter().enumerate() {
