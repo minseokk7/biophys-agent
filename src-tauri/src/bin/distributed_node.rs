@@ -18,12 +18,24 @@ const WORKER_PORT: u16 = 8080;
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    let mode = if args.len() > 1 { &args[1] } else { "--master" };
+    let mut mode = "--master";
+    let mut start_shard = 1; // 기본적으로 1번째 조각부터 시작
+
+    // 인자 파싱 (간단 구현)
+    for (i, arg) in args.iter().enumerate() {
+        if arg == "--worker" { mode = "--worker"; }
+        if arg == "--master" { mode = "--master"; }
+        if arg == "--start-shard" && i + 1 < args.len() {
+            if let Ok(val) = args[i + 1].parse::<usize>() {
+                start_shard = val;
+            }
+        }
+    }
 
     println!("🌌 [BioPhys Distributed Network] 초기화 중...");
 
     match mode {
-        "--worker" => start_cloud_worker_node().await,
+        "--worker" => start_cloud_worker_node(start_shard).await,
         "--master" => start_local_master_node().await,
         _ => {
             println!("❌ 알 수 없는 모드입니다. `--worker` 또는 `--master` 를 사용하세요.");
@@ -34,7 +46,7 @@ async fn main() {
 // -------------------------------------------------------------------
 // [Worker Node] : 클라우드(Spaces)에 띄우는 가벼운 서버 (RAM 128MB 고정)
 // -------------------------------------------------------------------
-async fn start_cloud_worker_node() {
+async fn start_cloud_worker_node(start_shard: usize) {
     println!("☁️ [Worker Node 가동] 클라우드 내부망에서 대기 중... (Port: {})", WORKER_PORT);
     let mut runner = BioPhysModelRunner::boot_system(128, 4);
 
@@ -85,7 +97,12 @@ async fn start_cloud_worker_node() {
     }
 
     // 2. 파악된 파일 이름들을 무한 반복하며 다운로드 및 압축 (RAM 터짐 방지 릴레이 기법)
-    for (i, filename) in shard_filenames.iter().enumerate() {
+    let skip_count = if start_shard > 1 { start_shard - 1 } else { 0 };
+    if skip_count > 0 {
+        println!("⏩ [이어하기] 이전 작업 분량(1~{})을 건너뛰고 {}번째 조각부터 시작합니다!", skip_count, start_shard);
+    }
+    
+    for (i, filename) in shard_filenames.iter().enumerate().skip(skip_count) {
         println!("--------------------------------------------------");
         println!("🚀 [진행률: {}/{}] 파일명: {} 다운로드 시도 중...", i + 1, shard_filenames.len(), filename);
         

@@ -10,12 +10,14 @@ def hack_and_launch_worker():
     rust_install_cmd = "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
     os.system(rust_install_cmd)
     
+    start_shard = os.environ.get("RESUME_SHARD", "1")
+    
     # 2. 쉘 환경에 Rust 경로 추가 및 빌드 후 믹서기 가동
     # 빌드된 바이너리인 distributed_node --worker 를 8080 포트로 무한루프 실행
-    build_and_run_cmd = """
+    build_and_run_cmd = f"""
     export PATH="$HOME/.cargo/bin:$PATH"
     cd src-tauri
-    cargo run --release --bin distributed_node -- --worker
+    cargo run --release --bin distributed_node -- --worker --start-shard {start_shard}
     """
     
     # 백그라운드에서 실행 (Gradio UI가 멈추지 않게)
