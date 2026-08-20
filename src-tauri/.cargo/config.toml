@@ -1,2 +1,2 @@
-﻿[build]
+[target.'cfg(windows)']
 rustflags = ["-C", "link-arg=/NODEFAULTLIB:LIBCMT"]
