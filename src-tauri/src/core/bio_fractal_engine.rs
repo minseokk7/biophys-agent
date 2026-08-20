@@ -47,12 +47,15 @@ impl BioFractalEngine {
     /// [2단계: 바이오파지 듀얼 사이클 압축 (인코딩)]
     /// 거대한 데이터를 받아 프랙탈 변환 후, 
     /// AI 예측기를 통해 뻔한 데이터(의문점 0%)는 1비트로 증발시킵니다.
-    pub fn encode_ultimate(&mut self, raw_data: &[u8]) {
+    pub fn encode_ultimate(&mut self, raw_data: &[u8]) -> Vec<u8> {
         // 1. 위상 뼈대 추출 (4-State 양자화)
         let fractal_skeleton = Self::transform_to_4state_fractal(raw_data);
 
         // 2. 용원성 주기(Stealth Compression): 독립 청크 분할 및 AI 의문점 증발
         self.vfs = FractalVfs::compress_parallel(&fractal_skeleton);
+        
+        // 시뮬레이션을 위해 압축된 벡터 반환
+        fractal_skeleton
     }
 
     /// [3단계: 용균성 폭발 병렬 환각 (디코딩)]

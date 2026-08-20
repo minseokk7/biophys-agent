@@ -26,10 +26,13 @@ async fn main() {
         .parse::<usize>()
         .unwrap_or(1);
 
+    let mut is_single = false;
+
     // 인자 파싱 (간단 구현)
     for (i, arg) in args.iter().enumerate() {
         if arg == "--worker" { mode = "--worker"; }
         if arg == "--master" { mode = "--master"; }
+        if arg == "--single" { is_single = true; }
         if arg == "--start-shard" && i + 1 < args.len() {
             if let Ok(val) = args[i + 1].parse::<usize>() {
                 start_shard = val;
@@ -37,13 +40,13 @@ async fn main() {
         }
     }
 
-    println!("🌌 [BioPhys Distributed Network] 초기화 중...");
+    eprintln!("🌌 [BioPhys Distributed Network] 초기화 중...");
 
     match mode {
-        "--worker" => start_cloud_worker_node(start_shard).await,
+        "--worker" => start_cloud_worker_node(start_shard, is_single).await,
         "--master" => start_local_master_node().await,
         _ => {
-            println!("❌ 알 수 없는 모드입니다. `--worker` 또는 `--master` 를 사용하세요.");
+            eprintln!("❌ 알 수 없는 모드입니다. `--worker` 또는 `--master` 를 사용하세요.");
         }
     }
 }
@@ -51,22 +54,21 @@ async fn main() {
 // -------------------------------------------------------------------
 // [Worker Node] : 클라우드(Spaces)에 띄우는 가벼운 서버 (RAM 128MB 고정)
 // -------------------------------------------------------------------
-async fn start_cloud_worker_node(start_shard: usize) {
-    println!("☁️ [Worker Node 가동] 클라우드 내부망에서 대기 중... (Port: {})", WORKER_PORT);
+async fn start_cloud_worker_node(start_shard: usize, is_single: bool) {
+    eprintln!("☁️ [Worker Node 가동] 클라우드 내부망에서 대기 중... (Port: {})", WORKER_PORT);
     let mut runner = BioPhysModelRunner::boot_system(128, 4);
 
-    println!("⏳ 마스터(유저 컴퓨터)의 압축 지시를 기다립니다...");
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    eprintln!("⏳ 마스터(유저 컴퓨터)의 압축 지시를 기다립니다...");
     
     // [최신 2026년 8월 기준 끝판왕 거대 모델 압축 파이프라인]
     let repo_id = "Qwen/Qwen3.8-2.4T-A95B";
-    println!("📥 [명령 수신] 2026년 8월 최신 400GB+ 거대 모델 '{}' 풀오토 다운로드 및 압축 가동!", repo_id);
+    eprintln!("📥 [명령 수신] 2026년 8월 최신 400GB+ 거대 모델 '{}' 풀오토 다운로드 및 압축 가동!", repo_id);
     
     let api = Api::new().expect("HF API 초기화 실패");
     let repo = api.model(repo_id.to_string());
     
     // 1. 설계도(index.json)를 다운받아 파일 이름(조각) 알아내기
-    println!("🔍 [설계도 분석] 거대 모델의 safetensors.index.json을 찾아 조각 개수를 파악합니다...");
+    eprintln!("🔍 [설계도 분석] 거대 모델의 safetensors.index.json을 찾아 조각 개수를 파악합니다...");
     let mut shard_filenames = Vec::new();
 
     match reqwest::get(&format!("https://huggingface.co/{}/resolve/main/model.safetensors.index.json", repo_id)).await {
@@ -82,39 +84,36 @@ async fn start_cloud_worker_node(start_shard: usize) {
                     }
                     shard_filenames = unique_files.into_iter().collect();
                     shard_filenames.sort(); // 순서대로 정렬 (예: 00001, 00002 ...)
-                    println!("🗺️ [분석 완료] 이 400GB 모델은 총 {} 개의 조각(Shard)으로 구성되어 있습니다!", shard_filenames.len());
+                    eprintln!("🗺️ [분석 완료] 이 400GB 모델은 총 {} 개의 조각(Shard)으로 구성되어 있습니다!", shard_filenames.len());
                 }
             } else {
-                println!("⚠️ 설계도(index.json) 파싱 실패!");
+                eprintln!("⚠️ 설계도(index.json) 파싱 실패!");
                 shard_filenames.push("model.safetensors".to_string());
             }
         },
         Ok(resp) => {
-            println!("⚠️ 설계도(index.json) 다운로드 실패: HTTP {}", resp.status());
-            println!("⚠️ 단일 파일(model.safetensors)로 다운로드를 시도합니다.");
+            eprintln!("⚠️ 설계도(index.json) 다운로드 실패: HTTP {}", resp.status());
             shard_filenames.push("model.safetensors".to_string());
         },
         Err(e) => {
-            println!("⚠️ 설계도(index.json) 요청 에러: {:?}", e);
-            println!("⚠️ 단일 파일(model.safetensors)로 다운로드를 시도합니다.");
+            eprintln!("⚠️ 설계도(index.json) 요청 에러: {:?}", e);
             shard_filenames.push("model.safetensors".to_string());
         }
     }
 
-    // 2. 파악된 파일 이름들을 무한 반복하며 다운로드 및 압축 (RAM 터짐 방지 릴레이 기법)
     let skip_count = if start_shard > 1 { start_shard - 1 } else { 0 };
     if skip_count > 0 {
-        println!("⏩ [이어하기] 이전 작업 분량(1~{})을 건너뛰고 {}번째 조각부터 시작합니다!", skip_count, start_shard);
+        eprintln!("⏩ [이어하기] 이전 작업 분량(1~{})을 건너뛰고 {}번째 조각부터 시작합니다!", skip_count, start_shard);
     }
     
     for (i, filename) in shard_filenames.iter().enumerate().skip(skip_count) {
-        println!("--------------------------------------------------");
-        println!("🚀 [진행률: {}/{}] 파일명: {} 다운로드 시도 중...", i + 1, shard_filenames.len(), filename);
+        eprintln!("--------------------------------------------------");
+        eprintln!("🚀 [진행률: {}/{}] 파일명: {} 다운로드 시도 중...", i + 1, shard_filenames.len(), filename);
         
         match repo.get(filename).await {
             Ok(model_file_path) => {
-                println!("✅ [다운로드 완료] 허깅페이스 초고속 내부망 다운로드 성공!");
-                println!("🧠 [{}] 가중치 파싱 및 BioPhys 4-State 믹서기 투입 중...", filename);
+                eprintln!("✅ [다운로드 완료] 허깅페이스 초고속 내부망 다운로드 성공!");
+                eprintln!("🧠 [{}] 가중치 파싱 및 BioPhys 4-State 믹서기 투입 중...", filename);
                 
                 let file = File::open(&model_file_path).unwrap();
                 let mmap = unsafe { MmapOptions::new().map(&file).unwrap() };
@@ -125,29 +124,40 @@ async fn start_cloud_worker_node(start_shard: usize) {
                         let tensor = tensors.tensor(first_tensor_name).unwrap();
                         let raw_data = tensor.data(); 
                         
-                        println!("⚡ [추출 성공] '{}' (크기: {} 바이트)", first_tensor_name, raw_data.len());
-                        println!("🛡️ [RAM 터짐 방지] 16GB 클라우드 메모리를 위해 50MB 단위로 쪼개서 믹서기에 투입합니다...");
+                        eprintln!("⚡ [추출 성공] '{}' (크기: {} 바이트)", first_tensor_name, raw_data.len());
+                        eprintln!("🛡️ [RAM 터짐 방지] 50MB 단위로 쪼개서 믹서기에 투입합니다...");
                         
                         let chunk_size = 50 * 1024 * 1024; // 50MB
                         for (idx, chunk) in raw_data.chunks(chunk_size).enumerate() {
-                            runner.load_and_compress_weights(chunk);
+                            let compressed = runner.load_and_compress_weights(chunk);
+                            
+                            if is_single {
+                                // 단일 모드일 경우 stdout으로 바이너리를 그대로 뿜어냄 (Python이 읽어서 HTTP로 서빙)
+                                let mut stdout = std::io::stdout();
+                                stdout.write_all(&compressed).unwrap();
+                            }
+
                             if idx % 50 == 0 {
-                                println!("   🌀 [갈아버리는 중...] {} / {} MB 완료", (idx * 50), raw_data.len() / (1024 * 1024));
+                                eprintln!("   🌀 [갈아버리는 중...] {} / {} MB 완료", (idx * 50), raw_data.len() / (1024 * 1024));
                             }
                         }
                     }
                 }
-                println!("✨ [{}] 완벽하게 스텔스 은닉 및 압축되었습니다. 다음 조각으로 넘어갑니다!", filename);
+                eprintln!("✨ [{}] 완벽하게 스텔스 은닉 및 압축되었습니다. 다음 조각으로 넘어갑니다!", filename);
             },
             Err(e) => {
-                println!("❌ [다운로드 실패] {} 파일을 가져오는데 실패했습니다: {:?}", filename, e);
+                eprintln!("❌ [다운로드 실패] {} 파일을 가져오는데 실패했습니다: {:?}", filename, e);
             }
+        }
+
+        if is_single {
+            eprintln!("🎯 [단일 조각 처리 완료] 스트리밍을 종료합니다.");
+            break; // 단일 모드면 하나만 하고 끝!
         }
     }
     
-    println!("==================================================");
-    println!("🔥 [최종 압축 완료] 거대 모델의 모든 조각이 믹서기에 갈려 프랙탈 뼈대로 변환되었습니다!");
-    println!("🚀 유저님의 마스터 컴퓨터로 단 6.25GB 용량만 쏘아보냅니다. 작전 대성공!");
+    eprintln!("==================================================");
+    eprintln!("🔥 [최종 압축 완료] 거대 모델의 모든 조각이 믹서기에 갈려 프랙탈 뼈대로 변환되었습니다!");
 }
 
 // -------------------------------------------------------------------
