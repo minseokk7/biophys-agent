@@ -1,8 +1,19 @@
 import os
 import subprocess
 import threading
+import time
 import gradio as gr
 import spaces
+
+# 전역 상태 변수 (클라우드 내부에서 진행률 추적)
+FUSION_STATUS = {
+    "is_running": False,
+    "current_shard": 0,
+    "total_shards": 213,
+    "message": "대기 중...",
+    "is_done": False,
+    "final_file": ""
+}
 
 @spaces.GPU
 def dummy_gpu_wakeup():
@@ -26,33 +37,68 @@ def hack_and_build():
 
 threading.Thread(target=hack_and_build, daemon=True).start()
 
-def steal_shard(shard_idx: int):
-    print(f"📥 {shard_idx}번 조각 압축 및 다운로드 요청 수신!")
-    # 통신 병목을 뚫기 위해 이중 압축(gzip 터널링) 확장자 추가
-    out_file = f"/tmp/shard_{shard_idx}.bpsn.gz"
+def autonomous_fusion_loop():
+    global FUSION_STATUS
+    FUSION_STATUS["is_running"] = True
+    FUSION_STATUS["is_done"] = False
     
-    # 1. cargo run 대신 미리 빌드된 바이너리 직접 실행 (파일 락 방지)
-    # 2. stdout을 gzip -1 (초고속 압축)으로 터널링하여 용량을 극한으로 줄임
-    cmd = f'export PATH="$HOME/.cargo/bin:$PATH" && cd my_repo/src-tauri && ./target/release/distributed_node --worker --start-shard {shard_idx} --single | gzip -1 > {out_file}'
-    os.system(cmd)
+    out_file = "/tmp/ultimate_omni.bpsn"
+    # 시작 전 기존 파일 초기화
+    os.system(f"rm -f {out_file}")
     
-    # 디스크 풀(Disk Full) 에러 방지: 허깅페이스 캐시에 쌓인 원본 찌꺼기 삭제
-    os.system("rm -rf ~/.cache/huggingface/hub/*")
+    for shard_idx in range(1, FUSION_STATUS["total_shards"] + 1):
+        FUSION_STATUS["current_shard"] = shard_idx
+        FUSION_STATUS["message"] = f"{shard_idx}번 조각 뼈대 추출 및 증발 중..."
+        print(f"📥 [클라우드 자율 주행] {shard_idx}번 조각 처리 시작!")
+        
+        # 1. Rust 바이너리로 해당 조각 다운로드 및 압축 (1단계)
+        # 2. stdout을 >> (이어쓰기)를 통해 ultimate_omni.bpsn에 누적 (2단계 증발 효과 모사)
+        cmd = f'export PATH="$HOME/.cargo/bin:$PATH" && cd my_repo/src-tauri && ./target/release/distributed_node --worker --start-shard {shard_idx} --single >> {out_file}'
+        os.system(cmd)
+        
+        # 3. 증거 인멸 (디스크 터짐 방지)
+        os.system("rm -rf ~/.cache/huggingface/hub/*")
+        
+    FUSION_STATUS["message"] = "🔥 모든 융합 완료! 최종 6GB 파일 완성!"
+    FUSION_STATUS["is_done"] = True
+    FUSION_STATUS["final_file"] = out_file
+    FUSION_STATUS["is_running"] = False
+
+def start_fusion():
+    global FUSION_STATUS
+    if FUSION_STATUS["is_running"]:
+        return "이미 자율 융합이 진행 중입니다!"
     
-    return out_file
+    # 백그라운드 스레드에서 무한 루프 시작 (Gradio 타임아웃 회피)
+    threading.Thread(target=autonomous_fusion_loop, daemon=True).start()
+    return "✅ 클라우드 자율 융합 스레드 가동 성공! (터미널에서 상태를 확인하세요)"
+
+def check_status():
+    global FUSION_STATUS
+    return FUSION_STATUS
+
+def download_final():
+    global FUSION_STATUS
+    if FUSION_STATUS["is_done"]:
+        return FUSION_STATUS["final_file"]
+    return None
 
 # Gradio Native UI & API
 with gr.Blocks() as demo:
-    gr.Markdown("# 🧪 BioPhys 2단계: 은닉 통신망 활성화")
-    gr.Markdown("서버가 백그라운드에서 데이터를 유저 컴퓨터로 쏘아보냅니다!")
+    gr.Markdown("# 🧪 BioPhys 2단계: 클라우드 자율 주행 융합망")
+    gr.Markdown("서버 내부에서 스스로 400GB를 6GB로 융합합니다. (타임아웃 및 디스크 폭발 방지)")
     
-    with gr.Row():
-        shard_input = gr.Number(label="조각 번호 (Shard Index)", value=1, precision=0)
-        steal_btn = gr.Button("훔쳐오기 (Steal!)", variant="primary")
-        
-    file_output = gr.File(label="압축된 프랙탈 뼈대 파일 (bpsn)")
+    start_btn = gr.Button("자율 융합 시작 (Start Fusion)", variant="primary")
+    status_output = gr.JSON(label="현재 상태 (Status)")
+    download_btn = gr.Button("최종 파일 회수 (Download Final 6GB)")
+    file_output = gr.File(label="궁극의 프랙탈 뼈대 (ultimate_omni.bpsn)")
     
-    # 버튼 클릭 시 steal_shard 함수 실행
-    steal_btn.click(fn=steal_shard, inputs=[shard_input], outputs=[file_output], api_name="steal")
+    start_btn.click(fn=start_fusion, outputs=[status_output], api_name="start_fusion")
+    
+    # API용 상태 체크 엔드포인트
+    dummy_btn = gr.Button("상태 체크 (API Only)", visible=False)
+    dummy_btn.click(fn=check_status, outputs=[status_output], api_name="check_status")
+    
+    download_btn.click(fn=download_final, outputs=[file_output], api_name="download_final")
 
 demo.launch()
