@@ -44,6 +44,8 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 kalosm-common = "0.4.0"
 kalosm-model-types = "0.4.0"
+hf-hub = { version = "0.3.2", features = ["tokio"] }
+safetensors = "0.4.5"
 
 # ================================================================
 # Android에서 제외되는 의존성 (OpenSSL / C++ 바인딩 포함)
