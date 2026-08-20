@@ -103,8 +103,16 @@ async fn start_cloud_worker_node() {
                         let tensor = tensors.tensor(first_tensor_name).unwrap();
                         let raw_data = tensor.data(); 
                         
-                        println!("⚡ [추출 성공] '{}' (크기: {} 바이트) 갈아버립니다!", first_tensor_name, raw_data.len());
-                        runner.load_and_compress_weights(raw_data);
+                        println!("⚡ [추출 성공] '{}' (크기: {} 바이트)", first_tensor_name, raw_data.len());
+                        println!("🛡️ [RAM 터짐 방지] 16GB 클라우드 메모리를 위해 50MB 단위로 쪼개서 믹서기에 투입합니다...");
+                        
+                        let chunk_size = 50 * 1024 * 1024; // 50MB
+                        for (idx, chunk) in raw_data.chunks(chunk_size).enumerate() {
+                            runner.load_and_compress_weights(chunk);
+                            if idx % 50 == 0 {
+                                println!("   🌀 [갈아버리는 중...] {} / {} MB 완료", (idx * 50), raw_data.len() / (1024 * 1024));
+                            }
+                        }
                     }
                 }
                 println!("✨ [{}] 완벽하게 스텔스 은닉 및 압축되었습니다. 다음 조각으로 넘어갑니다!", filename);

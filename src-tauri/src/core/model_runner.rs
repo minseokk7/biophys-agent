@@ -37,10 +37,8 @@ impl BioPhysModelRunner {
 
     /// 가중치 모델 로딩 및 극한 압축(증발) 실행
     pub fn load_and_compress_weights(&mut self, raw_weights: &[u8]) {
-        println!("🧠 모델 가중치 분석 및 4-State 의문점 증발 시작...");
         // 엔진을 돌려 뻔한 가중치를 0비트로 날려버림
         self.engine.encode_ultimate(raw_weights);
-        println!("✨ 극한 압축 완료! 가중치 패턴이 프랙탈 뼈대로 스텔스 은닉되었습니다.");
     }
 
     /// [실시간 추론(Inference) 실행 루프]
