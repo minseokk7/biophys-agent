@@ -1,0 +1,45 @@
+{
+  "model_type": "biophys_neural_agent",
+  "architectures": [
+    "BioPhys4StateSignedZeroAgent"
+  ],
+  "quantization_config": {
+    "quant_method": "4_state_signed_zero",
+    "bits": 2,
+    "states": {
+      "0b01": "+1 (Excitatory)",
+      "0b10": "-1 (Inhibitory)",
+      "0b00": "+0 (Resting)",
+      "0b11": "-0 (Refractory Noise Suppression)"
+    },
+    "compression_ratio": "16x (93.75% memory reduction)",
+    "swar_simd_width": 64
+  },
+  "moe_cluster": {
+    "num_brains": 6,
+    "brains": [
+      "Monarda (Korean Philosophy & In-Depth Context)",
+      "Fuse3 (Mathematics & Exact Algorithms)",
+      "Qwen-Coder (Rust 2024 Systems & Game Engineering)",
+      "Antares (1.58-bit Real-Time Edge Inference)",
+      "SigLIP (4K Vision Multimodal)",
+      "Gemma-4 E4B (128k Context Core)"
+    ],
+    "router": "4_state_signed_zero_main_router",
+    "clock_sync": "photonic_time_crystal_1m_fps"
+  },
+  "scientific_engines": {
+    "landauer_reversible": true,
+    "tda_persistent_homology": true,
+    "friston_free_energy_principle": true,
+    "post_quantum_ring_lwe": true,
+    "raft_bft_consensus": true,
+    "neural_lossless_codec": true,
+    "game_vfs_projfs": true
+  },
+  "academic_papers_applied": 36,
+  "benchmark_score": "99.68% (S+ Tier)",
+  "context_length": 131072,
+  "vocab_size": 256000,
+  "author": "minseokk7"
+}

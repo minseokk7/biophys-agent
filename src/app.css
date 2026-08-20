@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --color-glass-bg: rgba(10, 15, 25, 0.45);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-glass-highlight: rgba(255, 255, 255, 0.03);
+  --blur-liquid: 32px;
+}
+
+@layer utilities {
+  .liquid-glass {
+    background-color: var(--color-glass-bg);
+    backdrop-filter: blur(var(--blur-liquid));
+    -webkit-backdrop-filter: blur(var(--blur-liquid));
+    border: 1px solid var(--color-glass-border);
+    box-shadow: 
+      0 4px 30px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 var(--color-glass-highlight),
+      inset 1px 0 0 var(--color-glass-highlight);
+  }
+
+  .glass-panel-ultra {
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+  }
+
+  .text-glow-purple {
+    text-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 15px rgba(168,85,247,0.3); }
+  50% { opacity: 1; box-shadow: 0 0 35px rgba(168,85,247,0.8), inset 0 0 15px rgba(168,85,247,0.5); }
+}
+
+@keyframes dash-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.svg-flow {
+  stroke-dasharray: 10;
+  animation: dash-flow 1s linear infinite;
+}
+
+body {
+  background-color: transparent;
+  margin: 0;
+  overflow: hidden;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+textarea {
+  scrollbar-width: none;
+}
+textarea::-webkit-scrollbar {
+  display: none;
+}

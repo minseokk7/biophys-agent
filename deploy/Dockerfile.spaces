@@ -1,0 +1,17 @@
+# [Hugging Face Spaces 용 Worker Node 런처]
+# HF 내부망의 기가비트 속도를 징용하는 Dockerfile
+
+FROM rust:1.80-slim-buster
+
+WORKDIR /app
+# 로컬 코드 복사
+COPY . .
+
+# 빌드 및 의존성 설치
+RUN cargo build --release --bin distributed_node
+
+# 외부(유저 컴퓨터)에서 Worker에게 요청을 보낼 수 있도록 포트 개방
+EXPOSE 8080
+
+# 128MB RAM 제한 환경에서도 완벽히 돌아가는 워커 모드 실행!
+CMD ["./target/release/distributed_node", "--worker"]

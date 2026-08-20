@@ -1,0 +1,24 @@
+name: BioPhys Distributed Worker Node
+
+# 사용자가 원할 때 수동으로 스위치를 켤 수 있도록 workflow_dispatch 사용
+on:
+  workflow_dispatch:
+
+jobs:
+  run-worker:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 저장소 코드 가져오기
+      uses: actions/checkout@v3
+
+    - name: Rust 툴체인 세팅 (가장 빠른 Nightly/Stable)
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: 마이크로소프트 서버 징용 (Worker 런칭)
+      run: |
+        echo "🚀 GitHub 2코어 서버를 믹서기로 강제 전환합니다!"
+        # 백그라운드나 포트 포워딩 툴(ngrok/localtunnel)을 달아서 로컬 컴퓨터와 통신하게 만듭니다.
+        # 이 스크립트가 실행되는 6시간 동안 이 서버는 유저님의 믹서기 노예가 됩니다.
+        cd biophys-agent/src-tauri
+        cargo run --release --bin distributed_node -- --worker
