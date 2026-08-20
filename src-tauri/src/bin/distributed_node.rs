@@ -52,28 +52,33 @@ async fn start_cloud_worker_node() {
     println!("🔍 [설계도 분석] 거대 모델의 safetensors.index.json을 찾아 조각 개수를 파악합니다...");
     let mut shard_filenames = Vec::new();
 
-    match repo.get("model.safetensors.index.json").await {
-        Ok(index_path) => {
-            let mut file = File::open(index_path).unwrap();
-            let mut json_str = String::new();
-            file.read_to_string(&mut json_str).unwrap();
-            
-            let json: Value = serde_json::from_str(&json_str).unwrap();
-            if let Some(weight_map) = json.get("weight_map").and_then(|v| v.as_object()) {
-                let mut unique_files = HashSet::new();
-                for (_, filename) in weight_map {
-                    if let Some(name) = filename.as_str() {
-                        unique_files.insert(name.to_string());
+    match reqwest::get(&format!("https://huggingface.co/{}/resolve/main/model.safetensors.index.json", repo_id)).await {
+        Ok(resp) if resp.status().is_success() => {
+            let json_str = resp.text().await.unwrap_or_default();
+            if let Ok(json) = serde_json::from_str::<Value>(&json_str) {
+                if let Some(weight_map) = json.get("weight_map").and_then(|v| v.as_object()) {
+                    let mut unique_files = HashSet::new();
+                    for (_, filename) in weight_map {
+                        if let Some(name) = filename.as_str() {
+                            unique_files.insert(name.to_string());
+                        }
                     }
+                    shard_filenames = unique_files.into_iter().collect();
+                    shard_filenames.sort(); // 순서대로 정렬 (예: 00001, 00002 ...)
+                    println!("🗺️ [분석 완료] 이 400GB 모델은 총 {} 개의 조각(Shard)으로 구성되어 있습니다!", shard_filenames.len());
                 }
-                shard_filenames = unique_files.into_iter().collect();
-                shard_filenames.sort(); // 순서대로 정렬 (예: 00001, 00002 ...)
-                println!("🗺️ [분석 완료] 이 400GB 모델은 총 {} 개의 조각(Shard)으로 구성되어 있습니다!", shard_filenames.len());
+            } else {
+                println!("⚠️ 설계도(index.json) 파싱 실패!");
+                shard_filenames.push("model.safetensors".to_string());
             }
         },
+        Ok(resp) => {
+            println!("⚠️ 설계도(index.json) 다운로드 실패: HTTP {}", resp.status());
+            println!("⚠️ 단일 파일(model.safetensors)로 다운로드를 시도합니다.");
+            shard_filenames.push("model.safetensors".to_string());
+        },
         Err(e) => {
-            // index.json이 없는 경우 (가벼운 단일 모델)
-            println!("⚠️ 설계도(index.json) 다운로드 실패 원인: {:?}", e);
+            println!("⚠️ 설계도(index.json) 요청 에러: {:?}", e);
             println!("⚠️ 단일 파일(model.safetensors)로 다운로드를 시도합니다.");
             shard_filenames.push("model.safetensors".to_string());
         }
