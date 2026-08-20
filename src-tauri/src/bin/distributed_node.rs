@@ -71,9 +71,10 @@ async fn start_cloud_worker_node() {
                 println!("🗺️ [분석 완료] 이 400GB 모델은 총 {} 개의 조각(Shard)으로 구성되어 있습니다!", shard_filenames.len());
             }
         },
-        Err(_) => {
+        Err(e) => {
             // index.json이 없는 경우 (가벼운 단일 모델)
-            println!("⚠️ 설계도(index.json)가 없습니다. 단일 파일(model.safetensors)로 다운로드를 시도합니다.");
+            println!("⚠️ 설계도(index.json) 다운로드 실패 원인: {:?}", e);
+            println!("⚠️ 단일 파일(model.safetensors)로 다운로드를 시도합니다.");
             shard_filenames.push("model.safetensors".to_string());
         }
     }
